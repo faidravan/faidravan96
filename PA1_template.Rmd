@@ -1,0 +1,112 @@
+---
+title: "Untitled"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+First we'll store our data in a data frame so we can work more easily:
+
+```{r setchart, warning = FALSE}
+chart<-read.csv("C:/Users/Φαιδρα/Documents/activity.csv")
+chart$date <- as.POSIXct(chart$date, "%Y-%m-%d")
+weekday <- weekdays(chart$date)
+chart <- cbind(chart,weekday)
+str(chart)
+head(chart)
+
+```
+
+Then we plot a histogram of the total number of steps taken each day where we omit any NA values from the Steps column, :
+
+```{r histogram, warning = FALSE}
+Steps<- aggregate(steps ~ date, chart, sum, na.rm=TRUE)
+hist(Steps$steps, col = "lightgreen",breaks = seq(0,25000, by=2500))
+
+```
+
+We calculate the mean and median number of steps taken each day:
+
+```{r meanmedian, warning = FALSE}
+mean(Steps$steps)
+median(Steps$steps)
+
+```
+
+In this time series plot, we depict the the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis):
+
+```{r timeplot, warning = FALSE}
+StepsPerInterval<- aggregate(steps ~ interval, chart, mean, na.rm=TRUE)
+plot(StepsPerInterval, col = "darkgreen", type = "l")
+```
+
+```{r max, warning = FALSE}
+MaxInterval<-  StepsPerInterval[which.max(StepsPerInterval$steps),"interval"]
+```
+
+The interval with the maximum number of steps is `r MaxInterval`
+
+We use the following code to calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs):
+
+```{r missing, warning = FALSE}
+NaValues<-sum(is.na(chart$steps))
+```
+
+The missing values in the Steps column are `r NaValues`.
+
+We calculate the mean of all days, and replace these NA values with this value in the chart:
+
+```{r replaced, warning = FALSE}
+chart1<-na.omit(chart, chart$steps)
+fullmean<-mean(tapply(chart1$steps, chart1$date, mean))
+chart[is.na(chart)] <- fullmean
+```
+
+The new chart is presented in this histogram:
+
+```{r histogram2, warning = FALSE}
+
+StepsNew<- aggregate(steps ~ date, chart, sum, na.rm=TRUE)
+hist(StepsNew$steps , col = "lightgreen",breaks = seq(0,25000, by=2500), )
+
+```
+
+The new mean and median values are:
+
+```{r meanmedian2, warning = FALSE}
+mean(StepsNew$steps)
+median(StepsNew$steps)
+
+```
+We can see now that the mean does not change after the replacement of the NA values, while the median changes very slightly. We can safely use this method. 
+
+Now we create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r weekdays, warning = FALSE}
+chart$date <- as.Date(strptime(chart$date, format="%Y-%m-%d"))
+chart$day <- weekdays(chart$date)
+for (i in 1:nrow(chart)) {
+    if (chart[i,]$day %in% c("Σάββατο","Κυριακή")) {
+        chart[i,]$day<-"weekend"
+    }
+    else{
+        chart[i,]$day<-"weekday"
+    }
+}
+StepsByDay <- aggregate(chart$steps ~ chart$interval + chart$day, chart, mean)
+```
+
+Then we make a panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis):
+
+```{r weekdays hist, warning = FALSE}
+names(StepsByDay) <- c("interval", "day", "steps")
+library(lattice)
+
+xyplot(steps ~ interval | day, StepsByDay, type = "l", layout = c(1, 2), 
+    xlab = "Interval", ylab = "Number of steps")
+```
